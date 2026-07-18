@@ -32,7 +32,7 @@ const formSchema = z.object({
   customTipAmount: z.number().optional().default(0),
   message: z.string().max(1000).optional().default(""),
   receiptNumber: z.string().min(1),
-  honeypot: z.string().max(0).optional().default(""),
+  honeypot: z.string().optional().default(""),
 });
 
 function getClientIp(req: NextRequest): string {
