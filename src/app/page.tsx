@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -125,10 +125,10 @@ const sectionIcon = ({ title, icon: Icon }: { title: string; icon: React.Compone
 export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [receiptNumber] = useState(generateReceiptNumber);
+  const [receiptNumber, setReceiptNumber] = useState("");
   const [clientTz, setClientTz] = useState("");
+  const [minDate, setMinDate] = useState("");
   const [qrOpen, setQrOpen] = useState(false);
-  const turnstileRef = useRef<{ reset: () => void } | null>(null);
 
   const {
     register,
@@ -156,9 +156,12 @@ export default function Home() {
   const scheduleDate = watch("scheduleDate");
   const scheduleTime = watch("scheduleTime");
 
-  useMemo(() => {
+  useEffect(() => {
+    setReceiptNumber(generateReceiptNumber());
     try { setClientTz(Intl.DateTimeFormat().resolvedOptions().timeZone); }
     catch { setClientTz("UTC"); }
+    const d = new Date();
+    setMinDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
   }, []);
 
   const subtotal = (serviceWin ? 500 : 0) + (serviceOff ? 500 : 0);
@@ -295,7 +298,7 @@ export default function Home() {
               <div className="flex items-center gap-2 mb-4 pb-3 border-b" style={{ borderColor: "#DEE2E6" }}>
                 <FileText size={16} style={{ color: "#FF6B35" }} />
                 <span className="font-bold text-xs uppercase tracking-wider" style={{ color: "#868E96" }}>Receipt</span>
-                <span className="ml-auto font-mono text-xs" style={{ color: "#868E96" }}>{receiptNumber}</span>
+                <span className="ml-auto font-mono text-xs" style={{ color: "#868E96" }} suppressHydrationWarning>{receiptNumber}</span>
               </div>
               {serviceWin && <div className="flex justify-between py-1"><span>Windows Activation</span><span>\u20B1500</span></div>}
               {serviceOff && <div className="flex justify-between py-1"><span>Office Activation</span><span>\u20B1500</span></div>}
@@ -306,7 +309,7 @@ export default function Home() {
               </div>
             </div>
             <p className="text-xs mb-6" style={{ color: "#868E96" }}>
-              Save your receipt: <span className="font-mono font-bold">{receiptNumber}</span>
+              Save your receipt: <span className="font-mono font-bold" suppressHydrationWarning>{receiptNumber}</span>
             </p>
             <Button onClick={() => { reset(); setSubmitted(false); }} variant="outline" className="rounded-full px-7 py-2.5 text-sm font-semibold cursor-pointer" style={{ borderColor: "#FF6B35", color: "#FF6B35" }}>
               Book Another Service
@@ -434,7 +437,7 @@ export default function Home() {
                     {sectionIcon({ title: "Schedule", icon: CalendarDays })}
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor="scheduleDate" className="text-sm font-medium" style={{ color: "#1B2A4A" }}>Preferred Date <span style={{ color: "#E03131" }}>*</span></Label>
-                      <Input id="scheduleDate" type="date" min={(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })()} {...register("scheduleDate")} className="h-11 rounded-lg text-sm" style={{ borderColor: errors.scheduleDate ? "#E03131" : "#DEE2E6" }} />
+                      <Input id="scheduleDate" type="date" min={minDate} suppressHydrationWarning {...register("scheduleDate")} className="h-11 rounded-lg text-sm" style={{ borderColor: errors.scheduleDate ? "#E03131" : "#DEE2E6" }} />
                       {errors.scheduleDate && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="text-xs" style={{ color: "#E03131" }}>{errors.scheduleDate.message}</motion.p>}
                     </div>
 
@@ -570,7 +573,7 @@ export default function Home() {
                         <span className="inline-flex items-center gap-2"><Send size={16} />{subtotal > 0 ? `Pay \u20B1${total} & Book Service` : "Select a Service to Continue"}</span>
                       )}
                     </Button>
-                    <p className="text-center text-[11px]" style={{ color: "#ADB5BD" }}>Receipt: {receiptNumber} &middot; Setup takes 5-20 min via AnyDesk remote</p>
+                    <p className="text-center text-[11px]" style={{ color: "#ADB5BD" }}>Receipt: <span suppressHydrationWarning>{receiptNumber}</span> &middot; Setup takes 5-20 min via AnyDesk remote</p>
                   </form>
                 </CardContent>
               </Card>
@@ -589,7 +592,7 @@ export default function Home() {
 
       <footer className="border-t mt-auto" style={{ borderColor: "#DEE2E6", backgroundColor: "#fff" }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs" style={{ color: "#868E96" }}>
-          <span>&copy; {new Date().getFullYear()} {APP_NAME}. All rights reserved.</span>
+          <span>&copy; <span suppressHydrationWarning>{new Date().getFullYear()}</span> {APP_NAME}. All rights reserved.</span>
           <div className="flex gap-4">
             <a href="/privacy" className="hover:underline" style={{ color: "#868E96" }}>Privacy Policy</a>
             <a href="/terms" className="hover:underline" style={{ color: "#868E96" }}>Terms of Service</a>
