@@ -10,17 +10,38 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Get Your Microsoft Setup — Certified Partner",
+  title: {
+    default: "LicenseDesk — Genuine Windows & Office Activation",
+    template: "%s — LicenseDesk",
+  },
   description:
-    "Book a free consultation for expert Microsoft 365, Azure, Teams, and Windows deployment. You own the license, we deliver the expertise.",
+    "Book genuine Windows and Microsoft Office activation service. Certified Microsoft Authorized Reseller in the Philippines. Remote setup via AnyDesk, same-day service.",
   keywords: [
-    "Microsoft setup",
+    "Windows activation",
+    "Microsoft Office activation",
     "Microsoft 365",
-    "Azure",
-    "certified partner",
-    "IT services",
+    "certified reseller",
+    "IT services Philippines",
+    "LicenseDesk",
+    "AnyDesk remote support",
+    "genuine license",
   ],
-  icons: { icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg" },
+  authors: [{ name: "LicenseDesk" }],
+  openGraph: {
+    type: "website",
+    locale: "en_PH",
+    siteName: "LicenseDesk",
+    title: "LicenseDesk — Genuine Windows & Office Activation",
+    description:
+      "Book genuine Windows and Microsoft Office activation. Certified Microsoft Authorized Reseller. Remote AnyDesk setup, same-day service.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LicenseDesk — Genuine Windows & Office Activation",
+    description:
+      "Book genuine Windows and Microsoft Office activation. Certified Microsoft Authorized Reseller.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
