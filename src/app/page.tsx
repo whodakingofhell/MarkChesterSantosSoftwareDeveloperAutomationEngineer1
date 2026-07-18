@@ -31,6 +31,7 @@ import { TurnstileWidget } from "@/components/turnstile";
 
 const APP_NAME = "LicenseDesk";
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+const HMAC_SECRET = process.env.NEXT_PUBLIC_HMAC_SECRET || "";
 
 const TIME_SLOTS = [
   "8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM",
@@ -56,11 +57,12 @@ function generateReceiptNumber(): string {
 }
 
 async function signPayload(payload: string, timestamp: number): Promise<string> {
+  if (!HMAC_SECRET) return "";
   const encoder = new TextEncoder();
   const data = encoder.encode(`${timestamp}:${payload}`);
   const key = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(window.location.origin),
+    encoder.encode(HMAC_SECRET),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
