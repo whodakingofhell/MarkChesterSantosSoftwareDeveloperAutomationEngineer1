@@ -205,6 +205,55 @@ export const config = {
 };
 ```
 
+### 5. React Hydration Mismatches (SSR/SSG)
+Server and client render different HTML → React error #418.
+
+**Common causes:**
+- `Math.random()` — different values on server vs client
+- `new Date()` — timezone differences between server (UTC) and client (local)
+- `Intl.DateTimeFormat().resolvedOptions().timeZone` — unavailable on server
+- `useState(() => generateRandom())` — runs on both server and client
+
+**Fix:**
+```tsx
+// Generate client-only values in useEffect, not useState or useMemo
+const [id, setId] = useState("");
+const [tz, setTz] = useState("");
+const [minDate, setMinDate] = useState("");
+
+useEffect(() => {
+  setId(generateRandomId());
+  setTz(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const d = new Date();
+  setMinDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
+}, []);
+
+// Add suppressHydrationWarning to elements displaying client-only values
+<span suppressHydrationWarning>{id}</span>
+<input suppressHydrationWarning min={minDate} />
+```
+
+**Never do:**
+```tsx
+// WRONG: useMemo with side effects
+useMemo(() => { setTz(Intl.DateTimeFormat().resolvedOptions().timeZone); }, []);
+
+// WRONG: useState with Math.random()
+const [id] = useState(() => Math.random().toString(36));
+
+// WRONG: Inline new Date() in JSX
+<input min={`${new Date().getFullYear()}-${new Date().getMonth()+1}`} />
+```
+
+### 6. Headers.delete() in Edge Runtime
+Some Edge Runtime implementations throw on `Headers.delete()` for non-existent headers.
+Avoid `.delete()` calls. Use `.set()` to overwrite instead, or omit the header entirely.
+
+### 7. Vercel Stale Cache After Deploy
+Vercel CDN can serve stale cached responses for up to 5 minutes after env var changes.
+Env var changes do NOT trigger a redeploy. Always manually redeploy after adding env vars.
+Verify by checking response headers for your middleware-specific headers.
+
 ---
 
 ## LESSONS LEARNED

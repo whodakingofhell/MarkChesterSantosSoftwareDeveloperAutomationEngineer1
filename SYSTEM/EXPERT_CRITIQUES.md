@@ -235,3 +235,5 @@ Apply to EVERY deliverable before deployment. One error at a time. Verify after 
 | R | setInterval in rate-limit.ts dead code in serverless | LOW | SRE | FIXED |
 | S | turnstileToken schema has no max length | LOW | Full-Stack | FIXED |
 | T | Cache-Control no-store applied to all routes (kills static asset caching) | MEDIUM | Performance | FIXED |
+| U | React hydration error #418: Math.random/new Date differ server vs client | HIGH | Full-Stack | FIXED |
+| V | headers.delete() crashes Edge Runtime silently | HIGH | Cybersecurity | FIXED |
