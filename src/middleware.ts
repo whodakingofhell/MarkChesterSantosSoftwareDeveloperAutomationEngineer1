@@ -20,7 +20,6 @@ export function middleware(request: NextRequest) {
   response.headers.set("Origin-Agent-Cluster", "?1");
   response.headers.set("X-Download-Options", "noopen");
   response.headers.set("X-Request-Id", crypto.randomUUID());
-  response.headers.delete("X-Powered-By");
 
   const host = request.headers.get("host") || "";
   const origin = request.headers.get("origin");
