@@ -1,11 +1,18 @@
 {
   "name": "microsoft-setup-form",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.10"
+    }
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
@@ -17,7 +24,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.0.0",
     "lucide-react": "^0.525.0",
-    "next": "^15.3.0",
+    "next": "^15.5.20",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.60.0",
