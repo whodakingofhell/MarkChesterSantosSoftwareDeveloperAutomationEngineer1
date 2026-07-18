@@ -10,9 +10,7 @@
     "audit:fix": "npm audit fix"
   },
   "overrides": {
-    "next": {
-      "postcss": "8.5.10"
-    }
+    "postcss": "8.5.10"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
