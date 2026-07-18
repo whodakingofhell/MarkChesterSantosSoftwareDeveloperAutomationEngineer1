@@ -72,6 +72,7 @@ Before ANY deployment:
 
 - [ ] All 15 expert roles reviewed (CRITICAL minimum)
 - [ ] All critical issues resolved
+- [ ] `npm audit` returns 0 vulnerabilities (or overrides documented)
 - [ ] 10+ test scenarios pass
 - [ ] No secrets in committed code
 - [ ] Rate limiting on all external endpoints

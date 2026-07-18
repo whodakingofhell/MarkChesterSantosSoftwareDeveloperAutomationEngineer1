@@ -176,6 +176,8 @@ Apply to EVERY deliverable before deployment. One error at a time. Verify after 
 - [ ] Secrets in environment variables, never in code
 - [ ] Security headers (HSTS, CSP, X-Frame-Options, etc.)
 - [ ] No sensitive data in logs
+- [ ] `npm audit` returns 0 vulnerabilities
+- [ ] All dependency overrides documented
 
 ### Reliability
 - [ ] External API calls have retry logic (3 attempts, exponential backoff)
@@ -223,3 +225,4 @@ Apply to EVERY deliverable before deployment. One error at a time. Verify after 
 | H | No health check endpoint | MEDIUM | SRE | FIXED |
 | I | No SEO/OpenGraph metadata | MEDIUM | SEO | FIXED |
 | J | No footer links to legal pages | LOW | UX | FIXED |
+| K | PostCSS XSS via unescaped style tags (GHSA-qx2v-qp2m-jg93) | HIGH | Cybersecurity | FIXED |
