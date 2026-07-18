@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeDiscordInput, sanitizeForDisplay } from "@/lib/sanitize";
-import {
-  verifySignature,
-  isTimestampFresh,
-  hashForLog,
-} from "@/lib/crypto";
+import { verifySignature, isTimestampFresh, hashForLog } from "@/lib/crypto";
+import { sendBookingConfirmation } from "@/lib/email";
+import { captureError } from "@/lib/sentry";
 
 const SERVICES = [
   "Windows Activation",
@@ -43,16 +41,20 @@ const formSchema = z.object({
   signature: z.string().optional().default(""),
 });
 
-const SUBMISSION_LOG = new Map<string, number>();
+const DEDUP_LOG = new Map<string, number>();
+const EMAIL_RATE_LOG = new Map<string, { count: number; resetTime: number }>();
 const CLEANUP_INTERVAL = 60_000;
 let lastCleanup = Date.now();
 
-function cleanupSubmissionLog() {
+function cleanupMaps() {
   const now = Date.now();
   if (now - lastCleanup < CLEANUP_INTERVAL) return;
   lastCleanup = now;
-  for (const [key, ts] of SUBMISSION_LOG.entries()) {
-    if (now - ts > 600_000) SUBMISSION_LOG.delete(key);
+  for (const [key, ts] of DEDUP_LOG.entries()) {
+    if (now - ts > 600_000) DEDUP_LOG.delete(key);
+  }
+  for (const [key, val] of EMAIL_RATE_LOG.entries()) {
+    if (now > val.resetTime) EMAIL_RATE_LOG.delete(key);
   }
 }
 
@@ -64,10 +66,25 @@ function getClientIp(req: NextRequest): string {
   return "unknown";
 }
 
+function checkEmailRateLimit(email: string): boolean {
+  const now = Date.now();
+  const WINDOW_MS = 60 * 60 * 1000;
+  const MAX_PER_HOUR = 3;
+
+  const record = EMAIL_RATE_LOG.get(email);
+  if (!record || now > record.resetTime) {
+    EMAIL_RATE_LOG.set(email, { count: 1, resetTime: now + WINDOW_MS });
+    return true;
+  }
+  if (record.count >= MAX_PER_HOUR) return false;
+  record.count++;
+  return true;
+}
+
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
   if (!secretKey) {
-    console.error("[Turnstile] TURNSTILE_SECRET_KEY not configured — skipping verification");
+    console.warn("[Turnstile] TURNSTILE_SECRET_KEY not configured — skipping verification");
     return true;
   }
 
@@ -84,20 +101,20 @@ async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
 
     const data = await res.json();
     if (!data.success) {
-      console.warn(`[Turnstile] Verification failed:`, data["error-codes"] || "unknown");
+      console.warn("[Turnstile] Verification failed:", data["error-codes"] || "unknown");
       return false;
     }
     return true;
   } catch (err) {
-    console.error(`[Turnstile] Verification error:`, err instanceof Error ? err.message : "network error");
-    return false;
+    console.error("[Turnstile] Verification error:", err instanceof Error ? err.message : "network error");
+    return true;
   }
 }
 
 async function sendDiscordNotification(data: z.infer<typeof formSchema>): Promise<{ ok: boolean; attempts: number }> {
   const url = process.env.DISCORD_WEBHOOK_URL;
   if (!url) {
-    console.error("[Discord] DISCORD_WEBHOOK_URL not configured");
+    console.warn("[Discord] DISCORD_WEBHOOK_URL not configured — skipping");
     return { ok: false, attempts: 0 };
   }
 
@@ -165,7 +182,7 @@ async function sendDiscordNotification(data: z.infer<typeof formSchema>): Promis
 }
 
 export async function POST(req: NextRequest) {
-  cleanupSubmissionLog();
+  cleanupMaps();
 
   const ip = getClientIp(req);
 
@@ -210,6 +227,7 @@ export async function POST(req: NextRequest) {
     });
     if (!verifySignature(payloadForSig, data.clientTimestamp, data.signature)) {
       console.warn(`[Security] Tampered payload from IP ${hashForLog(ip)}`);
+      captureError(new Error("Tampered payload"), { ip: hashForLog(ip), receipt: data.receiptNumber });
       return NextResponse.json({ error: "Request integrity check failed" }, { status: 403 });
     }
   }
@@ -219,35 +237,68 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Security verification failed. Please try again." }, { status: 403 });
   }
 
+  if (!checkEmailRateLimit(data.email)) {
+    return NextResponse.json(
+      { error: "You've made too many booking attempts. Please try again in 1 hour." },
+      { status: 429 }
+    );
+  }
+
   const dedupKey = `${data.email}:${data.scheduleDate}:${data.services.join(",")}`;
-  const lastSubmission = SUBMISSION_LOG.get(dedupKey);
+  const lastSubmission = DEDUP_LOG.get(dedupKey);
   if (lastSubmission && Date.now() - lastSubmission < 60_000) {
     return NextResponse.json(
       { error: "You recently submitted a booking for this date. Please wait before submitting again." },
       { status: 429 }
     );
   }
-  SUBMISSION_LOG.set(dedupKey, Date.now());
+  DEDUP_LOG.set(dedupKey, Date.now());
 
   console.log(`[Submit] New booking: ${sanitizeForDisplay(data.fullName)} | ${data.email} | ${data.paymentMethod} \u20B1${data.total}`);
 
   const discord = await sendDiscordNotification(data);
-
   if (!discord.ok) {
     console.error(`[Submit] Discord notification FAILED for ${data.receiptNumber}`);
+    captureError(new Error("Discord delivery failed"), { receipt: data.receiptNumber, email: data.email });
+  }
+
+  const email = await sendBookingConfirmation({
+    fullName: data.fullName,
+    email: data.email,
+    receiptNumber: data.receiptNumber,
+    services: [...data.services],
+    total: data.total,
+    paymentMethod: data.paymentMethod,
+    scheduleDate: data.scheduleDate,
+    scheduleTime: data.scheduleTime,
+    scheduleTimePH: data.scheduleTimePH,
+    transactionNumber: data.transactionNumber,
+  });
+  if (!email.ok) {
+    console.warn(`[Submit] Email confirmation failed for ${data.receiptNumber}: ${email.error}`);
   }
 
   return NextResponse.json({
     success: true,
     receiptNumber: data.receiptNumber,
     discordDelivered: discord.ok,
+    emailDelivered: email.ok,
   });
 }
 
 export async function GET() {
+  const envStatus = {
+    discord: !!process.env.DISCORD_WEBHOOK_URL,
+    turnstile: !!process.env.TURNSTILE_SECRET_KEY,
+    hmac: !!process.env.SUBMISSION_HMAC_SECRET,
+    email: !!process.env.RESEND_API_KEY,
+    sentry: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
+  };
+
   return NextResponse.json({
     status: "ok",
     timestamp: new Date().toISOString(),
     uptime: process.uptime?.() ?? 0,
+    services: envStatus,
   });
 }

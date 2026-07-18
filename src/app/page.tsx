@@ -285,8 +285,11 @@ export default function Home() {
               <CheckCircle2 size={42} strokeWidth={1.8} style={{ color: "#2b9348" }} />
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold mb-3 tracking-tight" style={{ color: "#1B2A4A" }}>Booking Confirmed!</h1>
-            <p className="text-base max-w-md mb-6" style={{ color: "#868E96" }}>
+            <p className="text-base max-w-md mb-2" style={{ color: "#868E96" }}>
               A specialist will connect at your scheduled time via AnyDesk. You can watch the entire activation process live on your screen.
+            </p>
+            <p className="text-sm max-w-md mb-6" style={{ color: "#868E96" }}>
+              A confirmation email has been sent to <span className="font-semibold" style={{ color: "#1B2A4A" }}>{watch("email") || "your email"}</span>.
             </p>
             <div className="w-full max-w-sm rounded-xl border p-5 text-left text-sm mb-4" style={{ borderColor: "#DEE2E6", backgroundColor: "#fff" }}>
               <div className="flex items-center gap-2 mb-4 pb-3 border-b" style={{ borderColor: "#DEE2E6" }}>

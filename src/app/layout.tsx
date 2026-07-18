@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { initSentry } from "@/lib/sentry";
+
+initSentry();
 
 const inter = Inter({
   variable: "--font-geist-sans",
