@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,6 +19,7 @@ import {
   Clock,
   Building2,
   X,
+  Fingerprint,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -26,8 +27,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { TurnstileWidget } from "@/components/turnstile";
 
 const APP_NAME = "LicenseDesk";
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 const TIME_SLOTS = [
   "8:00 AM","9:00 AM","10:00 AM","11:00 AM","12:00 PM",
@@ -52,6 +55,20 @@ function generateReceiptNumber(): string {
   return `LD-${y}${m}${day}-${rand}`;
 }
 
+async function signPayload(payload: string, timestamp: number): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`${timestamp}:${payload}`);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(window.location.origin),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, data);
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 const formSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters").max(100),
   company: z.string().max(150),
@@ -71,6 +88,7 @@ const formSchema = z.object({
   customTipAmount: z.string(),
   message: z.string().max(1000),
   honeypot: z.string().max(0),
+  turnstileToken: z.string().min(1, "Please complete the security verification"),
 });
 
 type FormData = {
@@ -88,6 +106,7 @@ type FormData = {
   customTipAmount: string;
   message: string;
   honeypot: string;
+  turnstileToken: string;
 };
 
 const sectionIcon = ({ title, icon: Icon }: { title: string; icon: React.ComponentType<{ size?: number; className?: string; style?: React.CSSProperties }> }) => (
@@ -107,6 +126,7 @@ export default function Home() {
   const [receiptNumber] = useState(generateReceiptNumber);
   const [clientTz, setClientTz] = useState("");
   const [qrOpen, setQrOpen] = useState(false);
+  const turnstileRef = useRef<{ reset: () => void } | null>(null);
 
   const {
     register,
@@ -122,6 +142,7 @@ export default function Home() {
       serviceWindows: false, serviceOffice: false,
       scheduleDate: "", scheduleTime: "", paymentMethod: "",
       transactionNumber: "", tip: "0", customTipAmount: "", message: "", honeypot: "",
+      turnstileToken: "",
     },
   });
 
@@ -171,6 +192,8 @@ export default function Home() {
     const phone = data.phone.trim().replace(/[\s\-()]/g, "");
     const fullPhone = phone.startsWith("+") ? data.phone.trim() : `+63 ${phone}`;
 
+    const clientTimestamp = Date.now();
+
     const payload = {
       fullName: data.fullName,
       company: data.company || undefined,
@@ -192,10 +215,25 @@ export default function Home() {
       message: data.message || undefined,
       receiptNumber,
       honeypot: data.honeypot,
+      turnstileToken: data.turnstileToken,
+      clientTimestamp,
+      signature: "",
     };
 
+    try {
+      const payloadForSign = JSON.stringify({
+        email: data.email,
+        services: payload.services,
+        total,
+        receiptNumber,
+      });
+      payload.signature = await signPayload(payloadForSign, clientTimestamp);
+    } catch {
+      payload.signature = "";
+    }
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     try {
       const res = await fetch("/api/submit", {
@@ -504,6 +542,21 @@ export default function Home() {
                       Your information is only used to fulfill your service request and is never shared with third parties.
                     </p>
 
+                    {TURNSTILE_SITE_KEY && (
+                      <div className="flex flex-col items-center gap-2">
+                        <TurnstileWidget
+                          siteKey={TURNSTILE_SITE_KEY}
+                          onVerify={(token) => setValue("turnstileToken", token, { shouldValidate: true })}
+                          onExpire={() => setValue("turnstileToken", "", { shouldValidate: true })}
+                        />
+                        {errors.turnstileToken && (
+                          <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="text-xs" style={{ color: "#E03131" }}>
+                            {errors.turnstileToken.message}
+                          </motion.p>
+                        )}
+                      </div>
+                    )}
+
                     <Button type="submit" disabled={loading || subtotal === 0} className="w-full h-12 rounded-xl text-sm font-bold tracking-wide transition-all cursor-pointer"
                       style={{ backgroundColor: loading || subtotal === 0 ? "#e5a382" : "#FF6B35", color: "#fff" }}>
                       {loading ? (
@@ -521,6 +574,7 @@ export default function Home() {
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-medium" style={{ color: "#868E96" }}>
               <span className="inline-flex items-center gap-1.5"><Shield size={14} style={{ color: "#FF6B35" }} />Microsoft Authorized Reseller</span>
               <span className="inline-flex items-center gap-1.5"><Lock size={14} style={{ color: "#FF6B35" }} />SSL Encrypted</span>
+              <span className="inline-flex items-center gap-1.5"><Fingerprint size={14} style={{ color: "#FF6B35" }} />CAPTCHA Protected</span>
               <span className="inline-flex items-center gap-1.5"><Monitor size={14} style={{ color: "#FF6B35" }} />Live AnyDesk Session</span>
               <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={14} style={{ color: "#FF6B35" }} />5-20 Min Setup</span>
             </div>

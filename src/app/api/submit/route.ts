@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizeDiscordInput, sanitizeForDisplay } from "@/lib/sanitize";
+import {
+  verifySignature,
+  isTimestampFresh,
+  hashForLog,
+} from "@/lib/crypto";
 
 const SERVICES = [
   "Windows Activation",
@@ -33,7 +38,23 @@ const formSchema = z.object({
   message: z.string().max(1000).optional().default(""),
   receiptNumber: z.string().min(1),
   honeypot: z.string().optional().default(""),
+  turnstileToken: z.string().min(1, "Security verification required"),
+  clientTimestamp: z.number().min(1),
+  signature: z.string().optional().default(""),
 });
+
+const SUBMISSION_LOG = new Map<string, number>();
+const CLEANUP_INTERVAL = 60_000;
+let lastCleanup = Date.now();
+
+function cleanupSubmissionLog() {
+  const now = Date.now();
+  if (now - lastCleanup < CLEANUP_INTERVAL) return;
+  lastCleanup = now;
+  for (const [key, ts] of SUBMISSION_LOG.entries()) {
+    if (now - ts > 600_000) SUBMISSION_LOG.delete(key);
+  }
+}
 
 function getClientIp(req: NextRequest): string {
   const xff = req.headers.get("x-forwarded-for");
@@ -41,6 +62,36 @@ function getClientIp(req: NextRequest): string {
   const real = req.headers.get("x-real-ip");
   if (real) return real;
   return "unknown";
+}
+
+async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+  const secretKey = process.env.TURNSTILE_SECRET_KEY;
+  if (!secretKey) {
+    console.error("[Turnstile] TURNSTILE_SECRET_KEY not configured — skipping verification");
+    return true;
+  }
+
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        secret: secretKey,
+        response: token,
+        remoteip: ip,
+      }).toString(),
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      console.warn(`[Turnstile] Verification failed:`, data["error-codes"] || "unknown");
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`[Turnstile] Verification error:`, err instanceof Error ? err.message : "network error");
+    return false;
+  }
 }
 
 async function sendDiscordNotification(data: z.infer<typeof formSchema>): Promise<{ ok: boolean; attempts: number }> {
@@ -114,6 +165,8 @@ async function sendDiscordNotification(data: z.infer<typeof formSchema>): Promis
 }
 
 export async function POST(req: NextRequest) {
+  cleanupSubmissionLog();
+
   const ip = getClientIp(req);
 
   const { allowed, retryAfterMs } = checkRateLimit(ip);
@@ -140,9 +193,41 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
 
   if (data.honeypot) {
-    console.warn(`[Submit] Bot detected from IP ${ip}`);
+    console.warn(`[Submit] Bot detected from IP ${hashForLog(ip)}`);
     return NextResponse.json({ success: true });
   }
+
+  if (!isTimestampFresh(data.clientTimestamp, 300_000)) {
+    return NextResponse.json({ error: "Session expired. Please refresh and try again." }, { status: 400 });
+  }
+
+  if (data.signature) {
+    const payloadForSig = JSON.stringify({
+      email: data.email,
+      services: data.services,
+      total: data.total,
+      receiptNumber: data.receiptNumber,
+    });
+    if (!verifySignature(payloadForSig, data.clientTimestamp, data.signature)) {
+      console.warn(`[Security] Tampered payload from IP ${hashForLog(ip)}`);
+      return NextResponse.json({ error: "Request integrity check failed" }, { status: 403 });
+    }
+  }
+
+  const turnstileOk = await verifyTurnstile(data.turnstileToken, ip);
+  if (!turnstileOk) {
+    return NextResponse.json({ error: "Security verification failed. Please try again." }, { status: 403 });
+  }
+
+  const dedupKey = `${data.email}:${data.scheduleDate}:${data.services.join(",")}`;
+  const lastSubmission = SUBMISSION_LOG.get(dedupKey);
+  if (lastSubmission && Date.now() - lastSubmission < 60_000) {
+    return NextResponse.json(
+      { error: "You recently submitted a booking for this date. Please wait before submitting again." },
+      { status: 429 }
+    );
+  }
+  SUBMISSION_LOG.set(dedupKey, Date.now());
 
   console.log(`[Submit] New booking: ${sanitizeForDisplay(data.fullName)} | ${data.email} | ${data.paymentMethod} \u20B1${data.total}`);
 
