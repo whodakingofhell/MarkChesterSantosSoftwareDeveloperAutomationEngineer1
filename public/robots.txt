@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /api/
+Disallow: /_next/
+Disallow: /privacy
+Disallow: /terms
+Allow: /
+
+Sitemap: https://deploy-v2-tau-taupe.vercel.app/sitemap.xml

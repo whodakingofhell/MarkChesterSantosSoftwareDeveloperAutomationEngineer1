@@ -186,11 +186,17 @@ export async function POST(req: NextRequest) {
 
   const ip = getClientIp(req);
 
-  const { allowed, retryAfterMs } = checkRateLimit(ip);
-  if (!allowed) {
+  const rl = checkRateLimit(ip);
+  const rateLimitHeaders = {
+    "X-RateLimit-Limit": String(rl.limit),
+    "X-RateLimit-Remaining": String(rl.remaining),
+    "X-RateLimit-Reset": String(Math.ceil(rl.resetMs / 1000)),
+  };
+
+  if (!rl.allowed) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
-      { status: 429, headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) } }
+      { status: 429, headers: { ...rateLimitHeaders, "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } }
     );
   }
 
@@ -283,7 +289,7 @@ export async function POST(req: NextRequest) {
     receiptNumber: data.receiptNumber,
     discordDelivered: discord.ok,
     emailDelivered: email.ok,
-  });
+  }, { headers: rateLimitHeaders });
 }
 
 export async function GET() {

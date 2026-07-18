@@ -1,0 +1,5 @@
+Contact: mailto:security@licensedesk.ph
+Expires: 2027-01-01T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://deploy-v2-tau-taupe.vercel.app/security.txt
+Policy: https://deploy-v2-tau-taupe.vercel.app/privacy
