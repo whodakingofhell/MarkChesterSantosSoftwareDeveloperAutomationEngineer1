@@ -17,7 +17,7 @@ export function signPayload(payload: string, timestamp: number): string {
 }
 
 export function verifySignature(payload: string, timestamp: number, signature: string): boolean {
-  if (!HMAC_SECRET) return true;
+  if (!HMAC_SECRET) return false;
   const expected = signPayload(payload, timestamp);
   if (!expected || !signature) return false;
 

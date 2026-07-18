@@ -26,10 +26,3 @@ export function checkRateLimit(ip: string): {
   record.count++;
   return { allowed: true, retryAfterMs: 0, remaining: MAX_REQUESTS - record.count, limit: MAX_REQUESTS, resetMs: record.resetTime - now };
 }
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of rateLimitMap.entries()) {
-    if (now > value.resetTime) rateLimitMap.delete(key);
-  }
-}, 60_000);

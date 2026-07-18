@@ -36,7 +36,7 @@ const formSchema = z.object({
   message: z.string().max(1000).optional().default(""),
   receiptNumber: z.string().min(1),
   honeypot: z.string().optional().default(""),
-  turnstileToken: z.string().min(1, "Security verification required"),
+  turnstileToken: z.string().min(1, "Security verification required").max(4096),
   clientTimestamp: z.number().min(1),
   signature: z.string().optional().default(""),
 });
@@ -293,18 +293,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const envStatus = {
-    discord: !!process.env.DISCORD_WEBHOOK_URL,
-    turnstile: !!process.env.TURNSTILE_SECRET_KEY,
-    hmac: !!process.env.SUBMISSION_HMAC_SECRET,
-    email: !!process.env.RESEND_API_KEY,
-    sentry: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
-  };
-
   return NextResponse.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    uptime: process.uptime?.() ?? 0,
-    services: envStatus,
   });
 }
