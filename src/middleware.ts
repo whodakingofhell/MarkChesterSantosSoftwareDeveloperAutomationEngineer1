@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 const MAX_BODY_BYTES = 1024 * 64;
 
 export function middleware(request: NextRequest) {
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const nonce = btoa(crypto.randomUUID());
   const response = NextResponse.next();
 
   response.headers.set("X-Content-Type-Options", "nosniff");
