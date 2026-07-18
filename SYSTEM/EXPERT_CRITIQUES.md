@@ -226,3 +226,12 @@ Apply to EVERY deliverable before deployment. One error at a time. Verify after 
 | I | No SEO/OpenGraph metadata | MEDIUM | SEO | FIXED |
 | J | No footer links to legal pages | LOW | UX | FIXED |
 | K | PostCSS XSS via unescaped style tags (GHSA-qx2v-qp2m-jg93) | HIGH | Cybersecurity | FIXED |
+| L | Middleware silent failure: Buffer.from() unavailable in Edge Runtime | CRITICAL | Cybersecurity | FIXED |
+| M | CSP nonce leaked via X-Nonce response header | HIGH | Cybersecurity | FIXED |
+| N | Vercel CDN adds Access-Control-Allow-Origin: * (CORS wide open) | HIGH | Cybersecurity | FIXED |
+| O | Email HTML injection: user data interpolated without escaping | HIGH | Cybersecurity | FIXED |
+| P | Health check endpoint exposes env var configuration status | MEDIUM | Cybersecurity | FIXED |
+| Q | verifySignature returns true when HMAC_SECRET empty (fail-open) | HIGH | Cybersecurity | FIXED |
+| R | setInterval in rate-limit.ts dead code in serverless | LOW | SRE | FIXED |
+| S | turnstileToken schema has no max length | LOW | Full-Stack | FIXED |
+| T | Cache-Control no-store applied to all routes (kills static asset caching) | MEDIUM | Performance | FIXED |

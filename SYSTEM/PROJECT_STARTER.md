@@ -99,3 +99,20 @@ When multiple errors exist, resolve in this EXACT order:
 ```
 
 **NEVER skip an error. NEVER batch fixes. ONE at a time.**
+
+---
+
+## STEP 6: EDGE RUNTIME CHECKLIST (Vercel/Cloudflare Workers)
+
+Before deploying middleware or API routes to edge runtimes:
+
+- [ ] No `Buffer` usage (use `btoa()` instead)
+- [ ] No `setInterval`/`setTimeout` for cleanup (use request-time cleanup)
+- [ ] No file system access (`fs`, `path`)
+- [ ] No Node.js-only APIs (`child_process`, `net`, `dgram`)
+- [ ] `crypto` globals only: `crypto.randomUUID()`, `crypto.subtle.*`
+- [ ] Test with `next build` — edge functions compile differently than Node.js
+- [ ] Verify middleware actually runs on Vercel (check response headers)
+- [ ] Static asset paths excluded from middleware matcher
+- [ ] CORS headers explicitly set (Vercel CDN adds `Access-Control-Allow-Origin: *` by default)
+- [ ] In-memory state (Maps, counters) resets on cold start — design for it
